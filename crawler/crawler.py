@@ -98,7 +98,13 @@ class BlockListCrawler:
                 file.write("{}\n".format(domain))
 
     def url_to_fqdn(self, url: str) -> str:
+        if "//" not in url:
+            url = "//{}".format(url)
         return urlparse(url).hostname
+        # self.url_logger.info(url)
+        # if url.endswith("/"):
+        #     url = url[:-1]
+        # return url.split("//")[-1]
 
     def dump_content(self, pdf, source: str):
         index_map = {"cz": 0, "sk": 1, "bg": 1}
