@@ -93,9 +93,12 @@ class BlockListCrawler:
                 return req.content
 
     def persist_to_sftp(self, source: str):
+        name_translation = {"cz": "cr", "sk": "sk", "bg": "bg"}
         with FTP_TLS(os.environ["FTP_HOST"], user=os.environ["FTP_USERNAME"], passwd=os.environ["FTP_PASSWORD"]) as ftp:
             ftp.cwd(os.environ["FTP_PATH"])
-            ftp.storbinary("STOR mf{}.csv".format(source), open("/opt/crawler/exports/mf{}.csv".format(source), "rb"))
+            ftp.storbinary("STOR mf{}.csv".format(name_translation[source]),
+                           open("/opt/crawler/exports/mf{}.csv".format(source), "rb"))
+            self.logger.info("File uploaded for source {}".format(source))
 
     def write_csv(self, data: list, source: str):
         self.logger.info("Found {} domains from source mf{}".format(len(data), source))
