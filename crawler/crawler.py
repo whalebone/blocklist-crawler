@@ -4,6 +4,7 @@ import requests
 import re
 import os
 import logging
+from ftplib import FTP_TLS
 from urlextract import URLExtract
 from urllib.parse import urlparse
 from datetime import datetime, timedelta
@@ -91,6 +92,11 @@ class BlockListCrawler:
             if req.ok:
                 return req.content
 
+    def persist_to_sftp(self, source: str):
+        with FTP_TLS(os.environ["FTP_HOST"], user=os.environ["FTP_USERNAME"], passwd=os.environ["FTP_PASSWORD"]) as ftp:
+            ftp.cwd(os.environ["FTP_PATH"])
+            ftp.storbinary("STOR mf{}.csv".format(source), open("/opt/crawler/exports/mf{}.csv".format(source), "rb"))
+
     def write_csv(self, data: list, source: str):
         self.logger.info("Found {} domains from source mf{}".format(len(data), source))
         with open("/opt/crawler/exports/mf{}.csv".format(source), "w") as file:
@@ -140,6 +146,7 @@ class BlockListCrawler:
                     if self.hash_cache[source] != pdf_hash:
                         self.hash_cache[source] = pdf_hash
                         self.dump_content(pdf, source)
+                        self.persist_to_sftp(source)
                     else:
                         self.logger.info("Old version found for source {}, no change was made".format(source))
                 else:
