@@ -13,3 +13,9 @@ if __name__ == '__main__':
             scheduler.start()
         except Exception as re:
             print("Error in runtime {}".format(re))
+        finally:
+            try:
+                scheduler.remove_all_jobs()
+                scheduler.shutdown(wait=False)
+            except Exception as e:
+                print("Failed to cleanup scheduler")
