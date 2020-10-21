@@ -115,10 +115,17 @@ class BlockListCrawler:
         #     url = url[:-1]
         # return url.split("//")[-1]
 
+    def add_static_list(self):
+        with open("/opt/crawler/bg_static", "r") as static_file:
+            with open("/opt/crawler/exports/mfbg.csv", "a") as out:
+                for line in static_file:
+                    out.write(line)
+
     def dump_content(self, pdf, source: str):
         index_map = {"cz": 0, "sk": 1, "bg": 1}
         try:
-            tables = tabula.read_pdf(BytesIO(pdf), spreadsheet=True, pages='all', multiple_tables=True)
+            # tables = tabula.read_pdf(BytesIO(pdf), spreadsheet=True, pages='all', multiple_tables=True)
+            tables = tabula.read_pdf(BytesIO(pdf), lattice=True, pages='all', multiple_tables=True)
         except Exception as e:
             self.logger.warning("Failed to parse pdf {}, {}".format(source, e))
             self.send_error({"blocklist_crawler": "Failed to parse pdf {}, {}".format(source, e)})
@@ -126,8 +133,9 @@ class BlockListCrawler:
             domain_data = []
             for table in tables:
                 try:
-                    index = index_map[source] + 1 if table[0].isnull().values.all() else index_map[source]
-                    for column in table[index]:
+                    # index = index_map[source] + 1 if table[0].isnull().values.all() else index_map[source]
+                    index = index_map[source] + 1 if table.iloc[:, 0].isnull().values.all() else index_map[source]
+                    for column in table.iloc[:, index]:
                         if isinstance(column, str):
                             domains = [self.url_to_fqdn(url) for url in self.extractor.find_urls(column.lower())]
                             domain_data.extend(domains)
@@ -149,6 +157,8 @@ class BlockListCrawler:
                     if self.hash_cache[source] != pdf_hash:
                         self.hash_cache[source] = pdf_hash
                         self.dump_content(pdf, source)
+                        if source == "bg":
+                            self.add_static_list()
                         self.persist_to_sftp(source)
                     else:
                         self.logger.info("Old version found for source {}, no change was made".format(source))
