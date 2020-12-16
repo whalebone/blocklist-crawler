@@ -9,7 +9,8 @@ if __name__ == '__main__':
     while True:
         try:
             scheduler = BlockingScheduler(timezone="utc")
-            scheduler.add_job(crawler.get_all, "interval", minutes=int(os.environ.get("CHECK_PERIOD")))
+            scheduler.add_job(crawler.get_all, "interval", minutes=int(os.environ.get("CHECK_PERIOD")),
+                              replace_existing=True, misfire_grace_time=60)
             scheduler.start()
         except Exception as re:
             print("Error in runtime {}".format(re))
