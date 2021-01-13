@@ -4,6 +4,8 @@ import requests
 import re
 import os
 import logging
+import ssl
+from urllib3 import poolmanager
 from ftplib import FTP_TLS
 from urlextract import URLExtract
 from urllib.parse import urlparse
@@ -11,6 +13,20 @@ from datetime import datetime, timedelta
 from io import BytesIO
 from bs4 import BeautifulSoup
 from .tools import build_logger
+
+
+class TLSAdapter(requests.adapters.HTTPAdapter):
+
+    def init_poolmanager(self, connections, maxsize, block=False):
+        """Create and initialize the urllib3 PoolManager."""
+        ctx = ssl.create_default_context()
+        ctx.set_ciphers('DEFAULT@SECLEVEL=1')
+        self.poolmanager = poolmanager.PoolManager(
+                num_pools=connections,
+                maxsize=maxsize,
+                block=block,
+                ssl_version=ssl.PROTOCOL_TLS,
+                ssl_context=ctx)
 
 
 class UrlFetcher:
@@ -22,8 +38,10 @@ class UrlFetcher:
 
     def test_url(self, url: str) -> bool:
         try:
+            session = requests.session()
+            session.mount('https://', TLSAdapter())
             self.logger.info("Trying url {}".format(url))
-            req = requests.head(url)
+            req = session.head(url)
         except requests.exceptions.RequestException as e:
             self.logger.info("Failed to test url: {}, {}".format(url, e))
         else:
@@ -85,7 +103,9 @@ class BlockListCrawler:
 
     def get_pdf(self, url: str):
         try:
-            req = requests.get(url)
+            session = requests.session()
+            session.mount('https://', TLSAdapter())
+            req = session.get(url)
         except requests.exceptions.RequestException as re:
             self.logger.warning("Failed to fetch pdf from {}, {}".format(url, re))
         else:
@@ -162,8 +182,11 @@ class BlockListCrawler:
                         self.persist_to_sftp(source)
                     else:
                         self.logger.info("Old version found for source {}, no change was made".format(source))
+                    self.send_error({"blocklist_crawler": "success"})
                 else:
                     self.logger.info("No url found for source {}".format(source))
+                    self.send_error({"blocklist_crawler": "failed", "error": "No url found for source mf{}.".format(source)})
             except Exception as e:
                 self.logger.warning("failed to process data for source {}, {}".format(source, e), exc_info=True)
-                self.send_error({"blocklist_crawler": "Failed to get data from source mf{}, {}".format(source, e)})
+                self.send_error({"blocklist_crawler": "failed",
+                                 "error": "Failed to get data from source mf{}, {}".format(source, e)})
